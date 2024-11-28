@@ -1,18 +1,16 @@
 name: Sync Deploy Folder to S3
 
-on:  # Trigger when files in the deploy folder are pushed or deleted
-  push: 
-    branches:
-      - main
+on:
+  # Trigger when files in the deploy folder are pushed or deleted
+  push:
     paths:
       - 'deploy/**'
   delete:
     paths:
       - 'deploy/**'
 
-# Allow manual trigger
+  # Allow manual trigger
   workflow_dispatch:
-
 
 jobs:
   sync:
@@ -25,19 +23,40 @@ jobs:
 
       # Install AWS CLI
       - name: Install AWS CLI
-        run: sudo apt-get install -y awscli 
+        run: sudo apt-get install -y awscli
 
-      # Sync changes to S3
+      # Check if there are changes in the deploy folder
+      - name: Check for Changes
+        id: check_changes
+        run: |
+          CHANGES=$(aws s3 sync deploy s3://$S3_BUCKET/deploy --exact-timestamps --delete --dryrun)
+          if [ -z "$CHANGES" ]; then
+            echo "No changes detected. Skipping sync."
+            echo "::set-output name=should_sync::false"
+          else
+            echo "Changes detected. Proceeding with sync."
+            echo "::set-output name=should_sync::true"
+          fi
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+
+      # Sync only if changes are detected
       - name: Sync Deploy Folder with S3
+        if: steps.check_changes.outputs.should_sync == 'true'
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
           S3_BUCKET: ${{ secrets.S3_BUCKET }}
         run: |
-          aws s3 sync deploy s3://$S3_BUCKET/deploy --delete --exact-timestamps
+          aws s3 sync deploy s3://$S3_BUCKET/deploy --exact-timestamps --delete
+
       # Debug Sync Output
       - name: Debug Sync Output
+        if: steps.check_changes.outputs.should_sync == 'true'
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -45,3 +64,4 @@ jobs:
           S3_BUCKET: ${{ secrets.S3_BUCKET }}
         run: |
           aws s3 ls s3://$S3_BUCKET/deploy --recursive
+
