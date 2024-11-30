@@ -1,69 +1,48 @@
+
 name: Sync Deploy Folder to S3
 
 on:
-  # Trigger when files in the deploy folder are pushed or deleted
   push:
     paths:
-      - 'deploy/**'
-  delete:
-    paths:
-      - 'deploy/**'
-
-  # Allow manual trigger
-  workflow_dispatch:
+      - 'deploy/**' # Trigger on changes in deploy folder
+  workflow_dispatch: # Manual trigger
 
 jobs:
-  sync:
+  sync-to-s3:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout the repository
-      - name: Checkout Code
-        uses: actions/checkout@v3
+    # Checkout the repository
+    - name: Checkout Code
+      uses: actions/checkout@v3
 
-      # Install AWS CLI
-      - name: Install AWS CLI
-        run: |          
-          sudo apt-get update
-          sudo apt-get install -y awscli jq
+    # Set up AWS CLI
+    - name: Set up AWS CLI
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }} # Replace with your S3 bucket region
 
-      # Check if there are changes in the deploy folder
-      # - name: Check for Changes
-      #   id: check_changes
-      #   run: |
-      #     CHANGES=$(aws s3 sync deploy s3://$S3_BUCKET/deploy --exact-timestamps --delete --dryrun)
-      #     if [ -z "$CHANGES" ]; then
-      #       echo "No changes detected. Skipping sync."
-      #       echo "::set-output name=should_sync::false"
-      #     else
-      #       echo "Changes detected. Proceeding with sync."
-      #       echo "::set-output name=should_sync::true"
-      #     fi
-      #   env:
-      #     AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #     AWS_REGION: ${{ secrets.AWS_REGION }}
-      #     S3_BUCKET: ${{ secrets.S3_BUCKET }}
+    # Detect changes in deploy folder
+    - name: Get Changed Files
+      id: changes
+      run: |
+        # List changed files in deploy directory
+        echo "CHANGED_FILES=$(git diff --name-only HEAD^ HEAD -- deploy/)" >> $GITHUB_ENV
 
-      # Sync only if changes are detected
-      - name: Sync Deploy Folder with S3
-        # if: steps.check_changes.outputs.should_sync == 'true'
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          S3_BUCKET: ${{ secrets.S3_BUCKET }}
-        run: |
-          bash scripts/sync_to_s3.sh $S3_BUCKET $AWS_REGION
+    # Upload changed files to S3
+    - name: Upload Changed Files to S3
+      if: env.CHANGED_FILES != ""
+      run: |
+        for FILE in $CHANGED_FILES; do
+          echo "Uploading $FILE to S3"
+          aws s3 cp $FILE s3://${{ secrets.S3_BUCKET_NAME }}/$FILE --only-show-errors
+        done
 
-      # Debug Sync Output
-      # - name: Debug Sync Output
-      #   if: steps.check_changes.outputs.should_sync == 'true'
-      #   env:
-      #     AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #     AWS_REGION: ${{ secrets.AWS_REGION }}
-      #     S3_BUCKET: ${{ secrets.S3_BUCKET }}
-      #   run: |
-      #     aws s3 ls s3://$S3_BUCKET/deploy --recursive
-
+    # Manual sync all files in deploy folder
+    - name: Manual Sync All Files
+      if: github.event_name == 'workflow_dispatch'
+      run: |
+        echo "Manually syncing all files in deploy folder to S3"
+        aws s3 sync deploy/ s3://${{ secrets.S3_BUCKET_NAME }}/deploy/ --exact-timestamps
