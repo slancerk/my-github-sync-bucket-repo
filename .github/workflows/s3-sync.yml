@@ -45,7 +45,7 @@ jobs:
       run: |
         for FILE in $CHANGED_FILES; do
           echo "Uploading $FILE to S3"
-          aws s3 cp $FILE s3://${{ secrets.S3_BUCKET_NAME }}/$FILE --only-show-errors
+          aws s3 cp $FILE s3://${{ secrets.S3_BUCKET }}/$FILE --only-show-errors
         done
 
     # Manual sync all files in deploy folder
@@ -53,6 +53,6 @@ jobs:
       if: github.event_name == 'workflow_dispatch'
       run: |
         echo "Manually syncing all files in deploy folder to S3"
-        aws s3 sync deploy/ s3://${{ secrets.S3_BUCKET_NAME }}/deploy/ --exact-timestamps
+        aws s3 sync deploy/ s3://${{ secrets.S3_BUCKET }}/deploy/ --exact-timestamps
 
 
