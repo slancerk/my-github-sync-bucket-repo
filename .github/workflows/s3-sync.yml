@@ -21,18 +21,20 @@ jobs:
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }} # Replace with your S3 bucket region
+        aws-region: ${{ secrets.AWS_REGION }}
 
     # Detect changes in deploy folder
     - name: Get Changed Files
       id: changes
       run: |
         # List changed files in deploy directory
-        echo "CHANGED_FILES=$(git diff --name-only HEAD^ HEAD -- deploy/)" >> $GITHUB_ENV
+        CHANGED_FILES=$(git diff --name-only HEAD^ HEAD -- deploy/)
+        echo "CHANGED_FILES=${CHANGED_FILES}" >> $GITHUB_ENV
+        echo "Detected changes: $CHANGED_FILES"
 
     # Upload changed files to S3
     - name: Upload Changed Files to S3
-      if: env.CHANGED_FILES != ""
+      if: env.CHANGED_FILES && env.CHANGED_FILES != ''
       run: |
         for FILE in $CHANGED_FILES; do
           echo "Uploading $FILE to S3"
@@ -45,3 +47,4 @@ jobs:
       run: |
         echo "Manually syncing all files in deploy folder to S3"
         aws s3 sync deploy/ s3://${{ secrets.S3_BUCKET_NAME }}/deploy/ --exact-timestamps
+
