@@ -14,6 +14,8 @@ jobs:
     # Checkout the repository
     - name: Checkout Code
       uses: actions/checkout@v3
+      with:
+        fetch-depth: 2 # Fetch at least two commits for comparison
 
     # Set up AWS CLI
     - name: Set up AWS CLI
@@ -27,8 +29,13 @@ jobs:
     - name: Get Changed Files
       id: changes
       run: |
-        # List changed files in deploy directory
-        CHANGED_FILES=$(git diff --name-only HEAD^ HEAD -- deploy/)
+        # Check if the repository has a previous commit
+        if git rev-parse HEAD^ >/dev/null 2>&1; then
+          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD -- deploy/)
+        else
+          # If no previous commit, list all files in deploy/
+          CHANGED_FILES=$(find deploy/ -type f)
+        fi
         echo "CHANGED_FILES=${CHANGED_FILES}" >> $GITHUB_ENV
         echo "Detected changes: $CHANGED_FILES"
 
@@ -47,4 +54,5 @@ jobs:
       run: |
         echo "Manually syncing all files in deploy folder to S3"
         aws s3 sync deploy/ s3://${{ secrets.S3_BUCKET_NAME }}/deploy/ --exact-timestamps
+
 
