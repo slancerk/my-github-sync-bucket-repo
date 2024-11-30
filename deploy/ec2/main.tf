@@ -1,6 +1,6 @@
 # Define the AWS provider
 provider "aws" {
-  region = "us-east-1"  # Change to your desired AWS region
+  region = "ap-south-1"  # Change to your desired AWS region
 }
 
 # Create an S3 bucket
