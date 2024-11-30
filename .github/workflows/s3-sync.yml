@@ -1,4 +1,3 @@
-
 name: Sync Deploy Folder to S3
 
 on:
