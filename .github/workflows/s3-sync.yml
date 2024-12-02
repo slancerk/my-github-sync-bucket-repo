@@ -1,7 +1,87 @@
+# name: Sync Deploy Folder to S3
+
+# on:
+#   push:
+#     branches:
+#       - develop
+#     paths:
+#       - 'deploy/**' # Trigger on changes in deploy folder
+#   workflow_dispatch: # Manual trigger
+
+# jobs:
+#   sync-to-s3:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#     # Checkout the repository
+#     - name: Checkout Code
+#       uses: actions/checkout@v3
+#       with:
+#         fetch-depth: 2 # Fetch at least two commits for comparison
+
+#     # Set up AWS CLI
+#     - name: Set up AWS CLI
+#       uses: aws-actions/configure-aws-credentials@v2
+#       with:
+#         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#         aws-region: ${{ secrets.AWS_REGION }}
+
+#     # Detect changes in deploy folder
+#     - name: Get Changed Files
+#       id: changes
+#       run: |
+#         # Check if the repository has a previous commit
+#         if git rev-parse HEAD^ >/dev/null 2>&1; then
+#           CHANGED_FILES=$(git diff --name-only HEAD^ HEAD -- deploy/)
+#         else
+#           # If no previous commit, list all files in deploy/
+#           CHANGED_FILES=$(find deploy/ -type f)
+#         fi
+#         echo "CHANGED_FILES=${CHANGED_FILES}" >> $GITHUB_ENV
+#         echo "Detected changes: $CHANGED_FILES"
+
+#     # Upload changed files to S3
+#     - name: Upload Changed Files to S3
+#       if: env.CHANGED_FILES && env.CHANGED_FILES != ''
+#       run: |
+#         for FILE in $CHANGED_FILES; do
+#           echo "Uploading $FILE to S3"
+#           aws s3 cp $FILE s3://${{ secrets.S3_BUCKET }}/$FILE --only-show-errors
+#         done
+
+#     # # Manual sync all files in deploy folder
+#     # - name: Manual Sync All Files
+#     #   if: github.event_name == 'workflow_dispatch'
+#     #   run: |
+#     #     echo "Manually syncing all files in deploy folder to S3"
+#     #     aws s3 sync deploy/ s3://${{ secrets.S3_BUCKET }}/deploy/ --exact-timestamps
+
+#     # Sync changed files during manual trigger
+#     - name: Sync Changed Files on Manual Trigger
+#       if: github.event_name == 'workflow_dispatch'
+#       run: |
+#         # Detect changes again for manual trigger
+#         if git rev-parse HEAD^ >/dev/null 2>&1; then
+#           CHANGED_FILES=$(git diff --name-only HEAD^ HEAD -- deploy/)
+#         else
+#           # If no previous commit, list all files in deploy/
+#           CHANGED_FILES=$(find deploy/ -type f)
+#         fi
+#         echo "Detected changes for manual trigger: $CHANGED_FILES"
+#         # Upload only the changed files
+#         for FILE in $CHANGED_FILES; do
+#           echo "Uploading $FILE to S3"
+#           aws s3 cp $FILE s3://${{ secrets.S3_BUCKET }}/$FILE --only-show-errors
+#         done
+
+
 name: Sync Deploy Folder to S3
 
 on:
   push:
+    branches:
+      - develop
     paths:
       - 'deploy/**' # Trigger on changes in deploy folder
   workflow_dispatch: # Manual trigger
@@ -11,66 +91,39 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # Checkout the repository
-    - name: Checkout Code
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 2 # Fetch at least two commits for comparison
+      # Checkout the repository
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 2 # Fetch at least two commits for comparison
 
-    # Set up AWS CLI
-    - name: Set up AWS CLI
-      uses: aws-actions/configure-aws-credentials@v2
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }}
+      # Set up AWS CLI
+      - name: Set up AWS CLI
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-    # Detect changes in deploy folder
-    - name: Get Changed Files
-      id: changes
-      run: |
-        # Check if the repository has a previous commit
-        if git rev-parse HEAD^ >/dev/null 2>&1; then
-          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD -- deploy/)
-        else
-          # If no previous commit, list all files in deploy/
-          CHANGED_FILES=$(find deploy/ -type f)
-        fi
-        echo "CHANGED_FILES=${CHANGED_FILES}" >> $GITHUB_ENV
-        echo "Detected changes: $CHANGED_FILES"
+      # Detect changes in deploy folder
+      - name: Get Changed Files
+        id: changes
+        run: |
+          # Check if the repository has a previous commit
+          if git rev-parse HEAD^ >/dev/null 2>&1; then
+            CHANGED_FILES=$(git diff --name-only HEAD^ HEAD -- deploy/)
+          else
+            # If no previous commit, list all files in deploy/
+            CHANGED_FILES=$(find deploy/ -type f)
+          fi
+          echo "CHANGED_FILES=${CHANGED_FILES}" >> $GITHUB_ENV
+          echo "Detected changes: $CHANGED_FILES"
 
-    # Upload changed files to S3
-    - name: Upload Changed Files to S3
-      if: env.CHANGED_FILES && env.CHANGED_FILES != ''
-      run: |
-        for FILE in $CHANGED_FILES; do
-          echo "Uploading $FILE to S3"
-          aws s3 cp $FILE s3://${{ secrets.S3_BUCKET }}/$FILE --only-show-errors
-        done
-
-    # # Manual sync all files in deploy folder
-    # - name: Manual Sync All Files
-    #   if: github.event_name == 'workflow_dispatch'
-    #   run: |
-    #     echo "Manually syncing all files in deploy folder to S3"
-    #     aws s3 sync deploy/ s3://${{ secrets.S3_BUCKET }}/deploy/ --exact-timestamps
-
-    # Sync changed files during manual trigger
-    - name: Sync Changed Files on Manual Trigger
-      if: github.event_name == 'workflow_dispatch'
-      run: |
-        # Detect changes again for manual trigger
-        if git rev-parse HEAD^ >/dev/null 2>&1; then
-          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD -- deploy/)
-        else
-          # If no previous commit, list all files in deploy/
-          CHANGED_FILES=$(find deploy/ -type f)
-        fi
-        echo "Detected changes for manual trigger: $CHANGED_FILES"
-        # Upload only the changed files
-        for FILE in $CHANGED_FILES; do
-          echo "Uploading $FILE to S3"
-          aws s3 cp $FILE s3://${{ secrets.S3_BUCKET }}/$FILE --only-show-errors
-        done
-
-
+      # Upload changed files to S3
+      - name: Upload Changed Files to S3
+        if: env.CHANGED_FILES && env.CHANGED_FILES != ''
+        run: |
+          for FILE in $CHANGED_FILES; do
+            echo "Uploading $FILE to S3"
+            aws s3 cp $FILE s3://${{ secrets.S3_BUCKET }}/$FILE --only-show-errors
+          done
